@@ -10,10 +10,10 @@ git clone https://github.com/wnukmat/271B_Project
 
 ### Dependancies
 
-sklearn
-sys, os
-cv2
-numpy
+sklearn,
+sys, os,
+cv2,
+numpy,
 matplotlib
 
 ### Dataset
