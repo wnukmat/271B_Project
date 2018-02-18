@@ -29,9 +29,11 @@ except:
 
 image_count = 0
 trueSize = False #option to output postive samples of true size
-desiredS = 100
+desiredS = 30
 pad = 5
-negativeThresh = 0.15
+negativeThresh = 0.40
+max_count = 40000
+max_list = []
 for file in os.listdir(folder):
     if badPath(folder + "/" + file + "/images"):
         continue
@@ -49,14 +51,21 @@ for file in os.listdir(folder):
         mask_count = 0
         for im_mask in os.listdir(folder + "/" + file + "/masks"):
             if im.endswith(".png"):
+                if im_mask == '2ec5a0547b47b663b91224a0b0b031ba26c6d81dd8c2271a0142ff50e7a3c90e.png':
+                    print ''
                 mask = cv2.imread(folder + "/" + file + "/masks" + "/" + im_mask,cv2.IMREAD_GRAYSCALE)
+                
                 mask_count += 1
                 totalMask += cv2.threshold(mask,1,1,cv2.THRESH_BINARY)[1]
                 countours = cv2.findContours(mask,1,2)
-                cnt = countours[0]
-                x,y,w,h = cv2.boundingRect(cnt)
+                cnt = countours[1]
+                if len(cnt[0]) == 0:
+                    continue
+                x,y,w,h = cv2.boundingRect(cnt[0])
                 aspect = [w,h]
                 s = max(aspect)
+                if s <= desiredS:
+                    s = desiredS-2*pad
                 sample = np.zeros((s+2*pad,s+2*pad,3))
                 s_y_start = 0
                 s_x_start = 0
@@ -89,31 +98,17 @@ for file in os.listdir(folder):
                 cv2.imwrite(positive_sample_folder + '/' + im_mask, sample)
         
         negs = 0
-        i = 0
-        j = 0
-        negsLim = False
-        ijump = False
-        while i < totalMask.shape[0]-desiredS:
-            while j < totalMask.shape[1]-desiredS:
-                if negs == mask_count:
-                    negsLim = True
-                    break
-                val = sum(sum(totalMask[i:i+desiredS,j:j+desiredS]))
-                if val/(float(desiredS)**2) <= 0.15:
-                    negs += 1
-                    neg_sample = totalMask[i:i+desiredS,j:j+desiredS]
-                    cv2.imwrite(negative_sample_folder + '/' + str(negs) + '_' + im, neg_sample)
-                    j += desiredS
-                    if j >= totalMask.shape[1]-desiredS:
-                        ijump = True
-                    continue
-                j += 1
-            
-            if negsLim:
-                break
-            if ijump:
-                i += desiredS
-                ijump = False
-            else:
-                i += 1
-            j = 0
+        iters = 0
+        while negs < mask_count and iters < max_count:
+            iters += 1
+            c_x = np.random.randint(desiredS,img.shape[1]-desiredS)
+            c_y = np.random.randint(desiredS,img.shape[0]-desiredS)
+            s = int(desiredS/2.0)
+            candidate_sample = totalMask[c_y-s:c_y+s,c_x-s:c_x+s]
+            if sum(sum(candidate_sample))/float(desiredS**2) < negativeThresh:
+                negs += 1
+                negative_sample = img[c_y-s:c_y+s,c_x-s:c_x+s]
+                cv2.imwrite(negative_sample_folder + '/' + str(negs) + '_' + im, negative_sample)
+        if iters == max_count:
+            max_list.append(image_count,negs)
+                    
